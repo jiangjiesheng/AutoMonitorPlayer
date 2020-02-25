@@ -27,8 +27,10 @@ public class AutoMonitorActivity extends AppCompatActivity {
     private void init() {
         mPlayer = (AutoMonitorPlayer) findViewById(R.id.auto_video_player);
         mPlayer.setPlayerType(AutoMonitorPlayer.PLAYER_TYPE_IJK);
+        mPlayer.setLandscape(false);
+        mPlayer.setViewType(AutoMonitorPlayer.VIEW_TYPE_SURFACEVIEW);
         //这一步可以省略，有Player中有默认的实现
-        mPlayer.setDragConfig(new MonitorDragConfig(this));
+        mPlayer.setDragConfig(new MonitorDragConfig(this, mPlayer));
         mPlayer.setUp("http://tanzi27niu.cdsb.mobi/wps/wp-content/uploads/2017/05/2017-05-17_17-33-30.mp4", null);
     }
 
@@ -62,8 +64,14 @@ public class AutoMonitorActivity extends AppCompatActivity {
     class MonitorDragConfig implements AutoMonitorPlayer.DragConfig{
         private WeakReference<Context> mContext;
 
-        public MonitorDragConfig(Context context) {
+        public MonitorDragConfig(Context context, AutoMonitorPlayer player) {
             this.mContext = new WeakReference<Context>(context);;
+        }
+
+        @Override
+        public void onSingalClick() {
+            //暂停和播放交替
+            mPlayer.pauseOrStart();
         }
 
         @Override

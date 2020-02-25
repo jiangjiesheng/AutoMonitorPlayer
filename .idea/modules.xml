@@ -3,7 +3,10 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/AutoMonitorPlayer.iml" filepath="$PROJECT_DIR$/AutoMonitorPlayer.iml" />
+      <module fileurl="file://$PROJECT_DIR$/app/AutoMonitorPlayer-app.iml" filepath="$PROJECT_DIR$/app/AutoMonitorPlayer-app.iml" group="AutoMonitorPlayer/app" />
+      <module fileurl="file://$PROJECT_DIR$/nicevideoplayer/AutoMonitorPlayer-nicevideoplayer.iml" filepath="$PROJECT_DIR$/nicevideoplayer/AutoMonitorPlayer-nicevideoplayer.iml" group="AutoMonitorPlayer/nicevideoplayer" />
       <module fileurl="file://$PROJECT_DIR$/app/app.iml" filepath="$PROJECT_DIR$/app/app.iml" />
+      <module fileurl="file://$PROJECT_DIR$/git_download-AutoMonitorPlayer.iml" filepath="$PROJECT_DIR$/git_download-AutoMonitorPlayer.iml" group="AutoMonitorPlayer" />
       <module fileurl="file://$PROJECT_DIR$/nicevideoplayer/nicevideoplayer.iml" filepath="$PROJECT_DIR$/nicevideoplayer/nicevideoplayer.iml" />
     </modules>
   </component>

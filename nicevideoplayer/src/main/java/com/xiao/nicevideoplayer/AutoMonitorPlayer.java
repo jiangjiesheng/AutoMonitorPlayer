@@ -13,6 +13,7 @@ import android.util.AttributeSet;
 import android.view.Gravity;
 import android.view.Surface;
 import android.view.SurfaceHolder;
+import android.view.SurfaceView;
 import android.view.TextureView;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
@@ -25,11 +26,16 @@ import tv.danmaku.ijk.media.player.IMediaPlayer;
 import tv.danmaku.ijk.media.player.IjkMediaPlayer;
 
 /**
- * 实时监控播放器，相比NiceVideoPlayer，减少播放控制功能，但可拖动
- * 也支持录像文件播放，只有简单的单击界面实现播放/停止的功能
- * 可选使用TextureView或SurfaceView来播放，hik播放库需要使用SurfaceView
+ * create by LangZhichao on 2020/2/25
+ *
+ * 实时监控播放器，相比NiceVideoPlayer，去除播放控制功能
+ * 可配置播放器类型
+ * 支持网络地址、本地文件和海康监控播放
+ * 小窗模式下可拖动
+ * 可配置单击、双击如何响应,可用于控制播放和窗口切换
+ * 可选使用TextureView或SurfaceView来播放，hik播放库只支持SurfaceView
  */
-public class AutoMonitorPlayer extends FrameLayout implements TextureView.SurfaceTextureListener {
+public class AutoMonitorPlayer extends FrameLayout implements TextureView.SurfaceTextureListener,SurfaceHolder.Callback {
     public static final int STATE_ERROR = -1;          // 播放错误
     public static final int STATE_IDLE = 0;            // 播放未开始
     public static final int STATE_PREPARING = 1;       // 播放准备中
@@ -53,24 +59,34 @@ public class AutoMonitorPlayer extends FrameLayout implements TextureView.Surfac
     public static final int PLAYER_TYPE_IJK = 111;      // IjkPlayer
     public static final int PLAYER_TYPE_NATIVE = 222;   // Android原生MediaPlayer
 
-    public static final int DATA_SOURCE_TYPE_URL = 1111;
-    public static final int DATA_SOURCE_TYPE_STREAM = 2222;
+    public static final int VIEW_TYPE_TEXTUREVIEW = 1111;
+    public static final int VIEW_TYPE_SURFACEVIEW = 2222;
+
+    public static final int DATA_TYPE_URL = 11111;
+    public static final int DATA_TYPE_FILE = 22222;
+    public static final int DATA_TYPE_HIK = 33333;
 
     private Context mContext;
     private FrameLayout mContainer;
-    //播放源类型设置。要注意MediaPlayer并不支持通过流播放
-    private int mDataSourceType = DATA_SOURCE_TYPE_URL;
-    private String mAddress;
-    private int mPort;
-    private SurfaceHolder mHolder;
+
     private int mPlayerType = PLAYER_TYPE_IJK;
     private int mCurrentState = STATE_IDLE;
     private int mPlayerState = PLAYER_NORMAL;
+    private int mViewType = VIEW_TYPE_TEXTUREVIEW;
+    private int mDataType = DATA_TYPE_URL;
+    //是否允许切换横屏
+    private boolean mLandscape = false;
 
-    private TextureView mTextureView;
-    private SurfaceTexture mSurfaceTexture;
     private String mUrl;
     private Map<String, String> mHeaders;
+    private String mFilePath;
+    private String mAddress;
+    private int mPort;
+    private TextureView mTextureView;
+    private SurfaceTexture mSurfaceTexture;
+    private SurfaceView mSurfaceView;
+    //这个纯粹是用来标记是否要初始化MediaPlayer的
+    private SurfaceHolder mHolder;
     private IMediaPlayer mMediaPlayer;
     private int mBufferPercentage;
     private DragConfig mConfig = new DefaultDragConfig();
@@ -102,22 +118,49 @@ public class AutoMonitorPlayer extends FrameLayout implements TextureView.Surfac
     public void setUp(String url, Map<String, String> headers) {
         mUrl = url;
         mHeaders = headers;
+        mDataType = DATA_TYPE_URL;
         //设置源后自动开始
         start();
     }
 
     /**
-     * 用于适配海康播放库
+     * 播放本地文件
+     * @param filePath 视频文件完整目录,如:/sdcard/test.mp4
+     */
+    public void setUp(String filePath) {
+        mFilePath = filePath;
+        mDataType = DATA_TYPE_FILE;
+        //设置源后自动开始
+        start();
+    }
+
+    /**
+     * 用于适配海康播放库。需要使用SurfaceView，传入其holder
      * @param address socket地址
      * @param port 端口号
-     * @param holder 容器
      */
-    public void setUp(String address, int port, SurfaceHolder holder) {
+    public void setUp(String address, int port) {
         mAddress = address;
         mPort = port;
-        mHolder = holder;
+        mDataType = DATA_TYPE_HIK;
         //设置源后自动开始
         //start();
+    }
+
+    /**
+     * 是否允许最大化时横屏,默认不允许
+     * @param allow true允许,false不允许
+     */
+    public void setLandscape(boolean allow) {
+        mLandscape = allow;
+    }
+
+    public void setViewType(int type) {
+        if(type <VIEW_TYPE_TEXTUREVIEW || type > VIEW_TYPE_SURFACEVIEW) {
+            LogUtil.d("view type not found：" + type);
+            return;
+        }
+        mViewType = type;
     }
 
     /**
@@ -130,8 +173,13 @@ public class AutoMonitorPlayer extends FrameLayout implements TextureView.Surfac
                 || mCurrentState == STATE_ERROR
                 || mCurrentState == STATE_COMPLETED) {
             initMediaPlayer();
-            initTextureView();
-            addTextureView();
+            if(mViewType == VIEW_TYPE_TEXTUREVIEW) {
+                initTextureView();
+                addTextureView();
+            }else if(mViewType == VIEW_TYPE_SURFACEVIEW) {
+                initSurfaceView();
+                addSurfaceView();
+            }
         }
     }
 
@@ -173,6 +221,21 @@ public class AutoMonitorPlayer extends FrameLayout implements TextureView.Surfac
         mContainer.addView(mTextureView, 0, params);
     }
 
+    private void initSurfaceView() {
+        if (mSurfaceView == null) {
+            mSurfaceView = new SurfaceView(mContext);
+            mSurfaceView.getHolder().addCallback(this);
+        }
+    }
+
+    private void addSurfaceView() {
+        mContainer.removeView(mSurfaceView);
+        LayoutParams params = new LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT);
+        mContainer.addView(mSurfaceView, 0, params);
+    }
+
     /**
      * 释放资源，重置状态
      */
@@ -181,11 +244,21 @@ public class AutoMonitorPlayer extends FrameLayout implements TextureView.Surfac
             mMediaPlayer.release();
             mMediaPlayer = null;
         }
-        mContainer.removeView(mTextureView);
-        if (mSurfaceTexture != null) {
-            mSurfaceTexture.release();
-            mSurfaceTexture = null;
+        if(mViewType == VIEW_TYPE_TEXTUREVIEW) {
+            mContainer.removeView(mTextureView);
+            if (mSurfaceTexture != null) {
+                mSurfaceTexture.release();
+                mSurfaceTexture = null;
+            }
+        }else if(mViewType == VIEW_TYPE_SURFACEVIEW) {
+            mContainer.removeView(mSurfaceView);
+            if(mSurfaceView != null && mSurfaceView.getHolder() != null) {
+                mSurfaceView.getHolder().removeCallback(this);
+            }
+            mSurfaceView = null;
+            mHolder = null;
         }
+
         mCurrentState = STATE_IDLE;
         mPlayerState = PLAYER_NORMAL;
     }
@@ -287,31 +360,6 @@ public class AutoMonitorPlayer extends FrameLayout implements TextureView.Surfac
     };
 
     @Override
-    public void onSurfaceTextureAvailable(SurfaceTexture surfaceTexture, int width, int height) {
-        //播放器关联surface
-        if (mSurfaceTexture == null) {
-            mSurfaceTexture = surfaceTexture;
-            openMediaPlayer();
-        } else {
-            mTextureView.setSurfaceTexture(mSurfaceTexture);
-        }
-    }
-
-    private void openMediaPlayer() {
-        try {
-            mMediaPlayer.setDataSource(mContext.getApplicationContext(), Uri.parse(mUrl), mHeaders);
-            mMediaPlayer.setSurface(new Surface(mSurfaceTexture));
-            mMediaPlayer.prepareAsync();
-            mCurrentState = STATE_PREPARING;
-            //mController.setControllerState(mPlayerState, mCurrentState);
-            LogUtil.d("STATE_PREPARING");
-        } catch (IOException e) {
-            e.printStackTrace();
-            LogUtil.e("打开播放器发生错误", e);
-        }
-    }
-
-    @Override
     public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width, int height) {
     }
 
@@ -322,6 +370,66 @@ public class AutoMonitorPlayer extends FrameLayout implements TextureView.Surfac
 
     @Override
     public void onSurfaceTextureUpdated(SurfaceTexture surface) {
+    }
+
+    @Override
+    public void onSurfaceTextureAvailable(SurfaceTexture surfaceTexture, int width, int height) {
+        //播放器关联surface
+        if (mSurfaceTexture == null) {
+            mSurfaceTexture = surfaceTexture;
+            openMediaPlayer();
+        } else {
+            mTextureView.setSurfaceTexture(mSurfaceTexture);
+        }
+    }
+
+    @Override
+    public void surfaceCreated(SurfaceHolder holder) {
+        LogUtil.d("surfaceCreated");
+        //这里的holder就是mSurfaceView.getHolder()
+        //不同于TextureView,每次切换窗口都会destro和create一次,所以不能在这openMediaPlayer
+        if(mHolder == null) {
+            mHolder = holder;
+            openMediaPlayer();
+        }else {
+            mMediaPlayer.setDisplay(holder);
+        }
+    }
+
+    @Override
+    public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
+        LogUtil.d("surfaceChanged");
+        //重要
+        mMediaPlayer.setDisplay(holder);
+    }
+
+    @Override
+    public void surfaceDestroyed(SurfaceHolder holder) {
+        LogUtil.d("surfaceDestroyed");
+    }
+
+    private void openMediaPlayer() {
+        try {
+            if(mDataType == DATA_TYPE_URL) {
+                mMediaPlayer.setDataSource(mContext.getApplicationContext(), Uri.parse(mUrl), mHeaders);
+            }else if(mDataType == DATA_TYPE_FILE) {
+                mMediaPlayer.setDataSource(mFilePath);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+            LogUtil.e("打开播放器发生错误", e);
+        }
+
+        if(mViewType == VIEW_TYPE_TEXTUREVIEW) {
+            mMediaPlayer.setSurface(new Surface(mSurfaceTexture));
+        }else if(mViewType == VIEW_TYPE_SURFACEVIEW) {
+            mMediaPlayer.setSurface(mSurfaceView.getHolder().getSurface());
+        }
+
+        mMediaPlayer.prepareAsync();
+        mCurrentState = STATE_PREPARING;
+        //mController.setControllerState(mPlayerState, mCurrentState);
+        LogUtil.d("STATE_PREPARING");
     }
 
     public void enterFullScreen() {
@@ -336,8 +444,10 @@ public class AutoMonitorPlayer extends FrameLayout implements TextureView.Surfac
         }
         // 隐藏ActionBar、状态栏，并横屏
         NiceUtil.hideActionBar(mContext);
-        NiceUtil.scanForActivity(mContext)
-                .setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+        if(mLandscape) {
+            NiceUtil.scanForActivity(mContext)
+                    .setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+        }
 
         this.removeView(mContainer);
         ViewGroup contentView = (ViewGroup) NiceUtil.scanForActivity(mContext)
@@ -362,8 +472,10 @@ public class AutoMonitorPlayer extends FrameLayout implements TextureView.Surfac
     public boolean exitFullScreen() {
         if (mPlayerState == PLAYER_FULL_SCREEN) {
             NiceUtil.showActionBar(mContext);
-            NiceUtil.scanForActivity(mContext)
-                    .setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+            if(mLandscape) {
+                NiceUtil.scanForActivity(mContext)
+                        .setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+            }
 
             ViewGroup contentView = (ViewGroup) NiceUtil.scanForActivity(mContext)
                     .findViewById(android.R.id.content);
@@ -397,9 +509,8 @@ public class AutoMonitorPlayer extends FrameLayout implements TextureView.Surfac
 
         FrameLayout.LayoutParams params = mConfig.getTinyWindowLayoutParams();
         contentView.addView(mContainer, params);
-
         mPlayerState = PLAYER_TINY_WINDOW;
-        //mController.setControllerState(mPlayerState, mCurrentState);
+
         LogUtil.d("PLAYER_TINY_WINDOW");
     }
 
@@ -436,14 +547,31 @@ public class AutoMonitorPlayer extends FrameLayout implements TextureView.Surfac
         return mPlayerState == PLAYER_NORMAL;
     }
 
+    public void pauseOrStart() {
+        if(mPlayerType == PLAYER_TYPE_IJK || mPlayerType == PLAYER_TYPE_NATIVE) {
+            if(mCurrentState == STATE_PLAYING) {
+                mMediaPlayer.pause();
+                mCurrentState = STATE_PAUSED;
+            }else if(mCurrentState == STATE_PAUSED) {
+                mMediaPlayer.start();
+                mCurrentState = STATE_PLAYING;
+            }
+        }
+    }
+
     public void onDoubleClick() {
         mConfig.onDoubleClick();
+    }
+
+    public void onSingalClick() {
+        mConfig.onSingalClick();
     }
 
     /**
      * 自定义和可拖动/全屏的窗口相关的配置
      */
     public interface DragConfig {
+        void onSingalClick();
         void onDoubleClick();
         FrameLayout.LayoutParams getTinyWindowLayoutParams();
     }
@@ -456,6 +584,11 @@ public class AutoMonitorPlayer extends FrameLayout implements TextureView.Surfac
      * 默认实现类
      */
     class DefaultDragConfig implements AutoMonitorPlayer.DragConfig{
+
+        @Override
+        public void onSingalClick() {
+            pauseOrStart();
+        }
 
         @Override
         public void onDoubleClick() {

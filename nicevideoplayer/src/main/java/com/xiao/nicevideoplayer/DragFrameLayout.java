@@ -1,6 +1,8 @@
 package com.xiao.nicevideoplayer;
 
 import android.content.Context;
+import android.os.Handler;
+import android.os.Message;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.util.AttributeSet;
@@ -16,7 +18,8 @@ import android.view.View;
  */
 public class DragFrameLayout extends FrameLayout implements View.OnTouchListener, View.OnClickListener {
     //500ms内点击两次，算双击
-    private  static final long DOUBLE_CLICK_INTERVAL = 500;
+    private static final long DOUBLE_CLICK_INTERVAL = 500;
+    private static final int EXE_SINGAL_CLICK = 1;
     //屏幕信息
     protected int screenWidth;
     protected int screenHeight;
@@ -152,6 +155,21 @@ public class DragFrameLayout extends FrameLayout implements View.OnTouchListener
         }
     }
 
+    private Handler handler = new Handler() {
+
+        @Override
+        public void handleMessage(Message msg) {
+            super.handleMessage(msg);
+            switch (msg.what) {
+                case EXE_SINGAL_CLICK:
+                    mPlayer.onSingalClick();
+                    break;
+                default:
+                    break;
+            }
+        }
+    };
+
     @Override
     public void onClick(View v) {
         //只有onTouch返回false，onClick才能消费点击事件
@@ -159,6 +177,13 @@ public class DragFrameLayout extends FrameLayout implements View.OnTouchListener
         long currentTime = System.currentTimeMillis();
         if(currentTime - lastClickTime < DOUBLE_CLICK_INTERVAL) {
             mPlayer.onDoubleClick();
+            //确认是双击,取消单击响应
+            handler.removeMessages(EXE_SINGAL_CLICK);
+        }else {
+            //未避免和双击事件冲突, 发送延时消息
+            Message message = new Message();
+            message.what = EXE_SINGAL_CLICK;
+            handler.sendMessageDelayed(message, DOUBLE_CLICK_INTERVAL);
         }
         lastClickTime = currentTime;
     }
