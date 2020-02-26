@@ -7,15 +7,34 @@ import android.support.v7.app.AppCompatActivity;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.FrameLayout;
+import java.lang.ref.WeakReference;
 
 import com.xiao.nicevideoplayer.AutoMonitorPlayer;
 import com.xiao.nicevideoplayer.NiceUtil;
 import com.xiao.nicevieoplayer.R;
 
-import java.lang.ref.WeakReference;
+/*
+//用于海康播放器
+import com.hikvision.recorderplayer.player.PlayerWrapper;
+import android.view.SurfaceHolder;
+import com.xiao.nicevideoplayer.AutoMonitorPlayer.ISurfaceViewCallBack;
+import com.hikvision.utils.LogUtils;
+ */
 
 public class AutoMonitorActivity extends AppCompatActivity {
+    private static final String TAG = "AutoMonitorActivity";
+
     private AutoMonitorPlayer mPlayer;
+    /*
+    //hik视频播放
+    private PlayerWrapper mHikPlayer;
+    private SurfaceHolder mHolder;
+    private boolean mIsVisibleToUser = true;
+    private boolean mSurfaceCreated = false;
+    private static final String ADDRESS = "192.168.42.1";
+    private int mPort;
+    private static int mPorts[] = {9801, 9802, 9803, 9804, 9805};
+    */
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -26,13 +45,72 @@ public class AutoMonitorActivity extends AppCompatActivity {
 
     private void init() {
         mPlayer = (AutoMonitorPlayer) findViewById(R.id.auto_video_player);
+
+        //普通视频的设置
         mPlayer.setPlayerType(AutoMonitorPlayer.PLAYER_TYPE_IJK);
-        mPlayer.setLandscape(false);
         mPlayer.setViewType(AutoMonitorPlayer.VIEW_TYPE_SURFACEVIEW);
-        //这一步可以省略，有Player中有默认的实现
+        mPlayer.setLandscape(false);
+        //这一步可以省略，AutoMonitorPlayer中有默认的实现
         mPlayer.setDragConfig(new MonitorDragConfig(this, mPlayer));
         mPlayer.setUp("http://tanzi27niu.cdsb.mobi/wps/wp-content/uploads/2017/05/2017-05-17_17-33-30.mp4", null);
+
+        /*
+        //hik监控视频的设置。使用外部player，必须设置回调
+        mPort = mPorts[0];
+        mPlayer.setPlayerType(AutoMonitorPlayer.PLAYER_TYPE_NULL);
+        mPlayer.setViewType(AutoMonitorPlayer.VIEW_TYPE_SURFACEVIEW);
+        mPlayer.setLandscape(false);
+        mPlayer.setDragConfig(new MonitorDragConfig(this, mPlayer));
+        mPlayer.setSurfaceViewCallBack(new ISurfaceViewCallBack(){
+
+            @Override
+            public void surfaceCreated(SurfaceHolder holder) {
+                mHolder = holder;
+                mSurfaceCreated = true;
+                if (mIsVisibleToUser) {
+                    createPlayer();
+                }
+            }
+
+            @Override
+            public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
+
+            }
+
+            @Override
+            public void surfaceDestroyed(SurfaceHolder holder) {
+                mHolder = null;
+                mSurfaceCreated = false;
+                if (mIsVisibleToUser) {
+                    destroyPlayer();
+                }
+            }
+        });
+        */
     }
+
+    /*
+    private void createPlayer() {
+        mHikPlayer = new PlayerWrapper(getAssets());
+        mHikPlayer.setErrorCallback(new PlayerWrapper.ErrorCallback() {
+            @Override
+            public void onError(int errCode) {
+                if (mHikPlayer != null) {
+                    mHikPlayer.stop();
+                    mHikPlayer.play(ADDRESS, mPort, mHolder);
+                    LogUtils.d(TAG, "recreate player");
+                }
+            }
+        });
+        mHikPlayer.play(ADDRESS, mPort, mHolder);
+    }
+
+    private void destroyPlayer() {
+        mHikPlayer.destroy();
+        mHikPlayer = null;
+        LogUtils.d(TAG, "port:" + mPort + " destroyPlayer");
+    }
+     */
 
     @Override
     public void onBackPressed() {
@@ -61,7 +139,7 @@ public class AutoMonitorActivity extends AppCompatActivity {
         mPlayer.enterTinyWindow();
     }
 
-    class MonitorDragConfig implements AutoMonitorPlayer.DragConfig{
+    class MonitorDragConfig implements AutoMonitorPlayer.IDragConfig{
         private WeakReference<Context> mContext;
 
         public MonitorDragConfig(Context context, AutoMonitorPlayer player) {

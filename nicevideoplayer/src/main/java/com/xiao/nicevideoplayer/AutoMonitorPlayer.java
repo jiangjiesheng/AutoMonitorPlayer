@@ -26,14 +26,14 @@ import tv.danmaku.ijk.media.player.IMediaPlayer;
 import tv.danmaku.ijk.media.player.IjkMediaPlayer;
 
 /**
- * create by LangZhichao on 2020/2/25
+ * create by LangZhichao on 2020/2/26
  *
- * 实时监控播放器，相比NiceVideoPlayer，去除播放控制功能
- * 可配置播放器类型
- * 支持网络地址、本地文件和海康监控播放
+ * 相比NiceVideoPlayer，去除播放控制功能
+ * 可配置播放器类型,也可以用外部播放器
+ * 支持网络地址、本地文件或其他外部源用外部播放器播放
  * 小窗模式下可拖动
  * 可配置单击、双击如何响应,可用于控制播放和窗口切换
- * 可选使用TextureView或SurfaceView来播放，hik播放库只支持SurfaceView
+ * 可选使用TextureView或SurfaceView来播放
  */
 public class AutoMonitorPlayer extends FrameLayout implements TextureView.SurfaceTextureListener,SurfaceHolder.Callback {
     public static final int STATE_ERROR = -1;          // 播放错误
@@ -58,13 +58,13 @@ public class AutoMonitorPlayer extends FrameLayout implements TextureView.Surfac
 
     public static final int PLAYER_TYPE_IJK = 111;      // IjkPlayer
     public static final int PLAYER_TYPE_NATIVE = 222;   // Android原生MediaPlayer
+    public static final int PLAYER_TYPE_NULL = 333;   // 使用外部播放器
 
     public static final int VIEW_TYPE_TEXTUREVIEW = 1111;
     public static final int VIEW_TYPE_SURFACEVIEW = 2222;
 
     public static final int DATA_TYPE_URL = 11111;
     public static final int DATA_TYPE_FILE = 22222;
-    public static final int DATA_TYPE_HIK = 33333;
 
     private Context mContext;
     private FrameLayout mContainer;
@@ -80,8 +80,6 @@ public class AutoMonitorPlayer extends FrameLayout implements TextureView.Surfac
     private String mUrl;
     private Map<String, String> mHeaders;
     private String mFilePath;
-    private String mAddress;
-    private int mPort;
     private TextureView mTextureView;
     private SurfaceTexture mSurfaceTexture;
     private SurfaceView mSurfaceView;
@@ -89,7 +87,8 @@ public class AutoMonitorPlayer extends FrameLayout implements TextureView.Surfac
     private SurfaceHolder mHolder;
     private IMediaPlayer mMediaPlayer;
     private int mBufferPercentage;
-    private DragConfig mConfig = new DefaultDragConfig();
+    private IDragConfig mConfig = new DefaultDragConfig();
+    private ISurfaceViewCallBack mSurfaceViewCallback;
 
     public AutoMonitorPlayer(@NonNull Context context) {
         this(context,null);
@@ -99,20 +98,6 @@ public class AutoMonitorPlayer extends FrameLayout implements TextureView.Surfac
         super(context, attrs);
         mContext = context;
         init();
-    }
-
-    /**
-     * 初始化播放容器，用于存放TexureView。其实直接扩展TextureView取代Container也可以
-     */
-    private void init() {
-        //使用可拖动FrameLayout
-        mContainer = new DragFrameLayout(mContext);
-        ((DragFrameLayout)mContainer).setPlayer(this);
-        mContainer.setBackgroundColor(Color.BLACK);
-        LayoutParams params = new LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT);
-        this.addView(mContainer, params);
     }
 
     public void setUp(String url, Map<String, String> headers) {
@@ -135,19 +120,6 @@ public class AutoMonitorPlayer extends FrameLayout implements TextureView.Surfac
     }
 
     /**
-     * 用于适配海康播放库。需要使用SurfaceView，传入其holder
-     * @param address socket地址
-     * @param port 端口号
-     */
-    public void setUp(String address, int port) {
-        mAddress = address;
-        mPort = port;
-        mDataType = DATA_TYPE_HIK;
-        //设置源后自动开始
-        //start();
-    }
-
-    /**
      * 是否允许最大化时横屏,默认不允许
      * @param allow true允许,false不允许
      */
@@ -161,79 +133,6 @@ public class AutoMonitorPlayer extends FrameLayout implements TextureView.Surfac
             return;
         }
         mViewType = type;
-    }
-
-    /**
-     * 播放开始
-     */
-    private void start() {
-        //首先释放当前的播放器
-        release();
-        if (mCurrentState == STATE_IDLE
-                || mCurrentState == STATE_ERROR
-                || mCurrentState == STATE_COMPLETED) {
-            initMediaPlayer();
-            if(mViewType == VIEW_TYPE_TEXTUREVIEW) {
-                initTextureView();
-                addTextureView();
-            }else if(mViewType == VIEW_TYPE_SURFACEVIEW) {
-                initSurfaceView();
-                addSurfaceView();
-            }
-        }
-    }
-
-    private void initMediaPlayer() {
-        if (mMediaPlayer == null) {
-            switch (mPlayerType) {
-                case PLAYER_TYPE_NATIVE:
-                    mMediaPlayer = new AndroidMediaPlayer();
-                    break;
-                case PLAYER_TYPE_IJK:
-                default:
-                    mMediaPlayer = new IjkMediaPlayer();
-                    break;
-            }
-            mMediaPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC);
-            mMediaPlayer.setScreenOnWhilePlaying(true);
-
-            mMediaPlayer.setOnPreparedListener(mOnPreparedListener);
-            mMediaPlayer.setOnVideoSizeChangedListener(mOnVideoSizeChangedListener);
-            mMediaPlayer.setOnCompletionListener(mOnCompletionListener);
-            mMediaPlayer.setOnErrorListener(mOnErrorListener);
-            mMediaPlayer.setOnInfoListener(mOnInfoListener);
-            mMediaPlayer.setOnBufferingUpdateListener(mOnBufferingUpdateListener);
-        }
-    }
-
-    private void initTextureView() {
-        if (mTextureView == null) {
-            mTextureView = new TextureView(mContext);
-            mTextureView.setSurfaceTextureListener(this);
-        }
-    }
-
-    private void addTextureView() {
-        mContainer.removeView(mTextureView);
-        LayoutParams params = new LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT);
-        mContainer.addView(mTextureView, 0, params);
-    }
-
-    private void initSurfaceView() {
-        if (mSurfaceView == null) {
-            mSurfaceView = new SurfaceView(mContext);
-            mSurfaceView.getHolder().addCallback(this);
-        }
-    }
-
-    private void addSurfaceView() {
-        mContainer.removeView(mSurfaceView);
-        LayoutParams params = new LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT);
-        mContainer.addView(mSurfaceView, 0, params);
     }
 
     /**
@@ -270,166 +169,6 @@ public class AutoMonitorPlayer extends FrameLayout implements TextureView.Surfac
      */
     public void setPlayerType(int playerType) {
         mPlayerType = playerType;
-    }
-
-    private IMediaPlayer.OnPreparedListener mOnPreparedListener
-            = new IMediaPlayer.OnPreparedListener() {
-        @Override
-        public void onPrepared(IMediaPlayer mp) {
-            mp.start();
-            mCurrentState = STATE_PREPARED;
-            //mController.setControllerState(mPlayerState, mCurrentState);
-            LogUtil.d("onPrepared ——> STATE_PREPARED");
-        }
-    };
-
-    private IMediaPlayer.OnVideoSizeChangedListener mOnVideoSizeChangedListener
-            = new IMediaPlayer.OnVideoSizeChangedListener() {
-        @Override
-        public void onVideoSizeChanged(IMediaPlayer mp, int width, int height, int sar_num, int sar_den) {
-            LogUtil.d("onVideoSizeChanged ——> width：" + width + "，height：" + height);
-        }
-    };
-
-    private IMediaPlayer.OnCompletionListener mOnCompletionListener
-            = new IMediaPlayer.OnCompletionListener() {
-        @Override
-        public void onCompletion(IMediaPlayer mp) {
-            mCurrentState = STATE_COMPLETED;
-            //mController.setControllerState(mPlayerState, mCurrentState);
-            LogUtil.d("onCompletion ——> STATE_COMPLETED");
-            NiceVideoPlayerManager.instance().setCurrentNiceVideoPlayer(null);
-        }
-    };
-
-    private IMediaPlayer.OnErrorListener mOnErrorListener
-            = new IMediaPlayer.OnErrorListener() {
-        @Override
-        public boolean onError(IMediaPlayer mp, int what, int extra) {
-            mCurrentState = STATE_ERROR;
-            //mController.setControllerState(mPlayerState, mCurrentState);
-            LogUtil.d("onError ——> STATE_ERROR ———— what：" + what);
-            return false;
-        }
-    };
-
-    private IMediaPlayer.OnInfoListener mOnInfoListener
-            = new IMediaPlayer.OnInfoListener() {
-        @Override
-        public boolean onInfo(IMediaPlayer mp, int what, int extra) {
-            if (what == MediaPlayer.MEDIA_INFO_VIDEO_RENDERING_START) {
-                // 播放器开始渲染
-                mCurrentState = STATE_PLAYING;
-                //mController.setControllerState(mPlayerState, mCurrentState);
-                LogUtil.d("onInfo ——> MEDIA_INFO_VIDEO_RENDERING_START：STATE_PLAYING");
-            } else if (what == IMediaPlayer.MEDIA_INFO_BUFFERING_START) {
-                // MediaPlayer暂时不播放，以缓冲更多的数据
-                if (mCurrentState == STATE_PAUSED || mCurrentState == STATE_BUFFERING_PAUSED) {
-                    mCurrentState = STATE_BUFFERING_PAUSED;
-                    LogUtil.d("onInfo ——> MEDIA_INFO_BUFFERING_START：STATE_BUFFERING_PAUSED");
-                } else {
-                    mCurrentState = STATE_BUFFERING_PLAYING;
-                    LogUtil.d("onInfo ——> MEDIA_INFO_BUFFERING_START：STATE_BUFFERING_PLAYING");
-                }
-                //.setControllerState(mPlayerState, mCurrentState);
-            } else if (what == IMediaPlayer.MEDIA_INFO_BUFFERING_END) {
-                // 填充缓冲区后，MediaPlayer恢复播放/暂停
-                if (mCurrentState == STATE_BUFFERING_PLAYING) {
-                    mCurrentState = STATE_PLAYING;
-                    //mController.setControllerState(mPlayerState, mCurrentState);
-                    LogUtil.d("onInfo ——> MEDIA_INFO_BUFFERING_END： STATE_PLAYING");
-                }
-                if (mCurrentState == STATE_BUFFERING_PAUSED) {
-                    mCurrentState = STATE_PAUSED;
-                    //mController.setControllerState(mPlayerState, mCurrentState);
-                    LogUtil.d("onInfo ——> MEDIA_INFO_BUFFERING_END： STATE_PAUSED");
-                }
-            } else {
-                LogUtil.d("onInfo ——> what：" + what);
-            }
-            return true;
-        }
-    };
-
-    private IMediaPlayer.OnBufferingUpdateListener mOnBufferingUpdateListener
-            = new IMediaPlayer.OnBufferingUpdateListener() {
-        @Override
-        public void onBufferingUpdate(IMediaPlayer mp, int percent) {
-            mBufferPercentage = percent;
-        }
-    };
-
-    @Override
-    public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width, int height) {
-    }
-
-    @Override
-    public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
-        return mSurfaceTexture == null;
-    }
-
-    @Override
-    public void onSurfaceTextureUpdated(SurfaceTexture surface) {
-    }
-
-    @Override
-    public void onSurfaceTextureAvailable(SurfaceTexture surfaceTexture, int width, int height) {
-        //播放器关联surface
-        if (mSurfaceTexture == null) {
-            mSurfaceTexture = surfaceTexture;
-            openMediaPlayer();
-        } else {
-            mTextureView.setSurfaceTexture(mSurfaceTexture);
-        }
-    }
-
-    @Override
-    public void surfaceCreated(SurfaceHolder holder) {
-        LogUtil.d("surfaceCreated");
-        //这里的holder就是mSurfaceView.getHolder()
-        //不同于TextureView,每次切换窗口都会destro和create一次,所以不能在这openMediaPlayer
-        if(mHolder == null) {
-            mHolder = holder;
-            openMediaPlayer();
-        }else {
-            mMediaPlayer.setDisplay(holder);
-        }
-    }
-
-    @Override
-    public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
-        LogUtil.d("surfaceChanged");
-        //重要
-        mMediaPlayer.setDisplay(holder);
-    }
-
-    @Override
-    public void surfaceDestroyed(SurfaceHolder holder) {
-        LogUtil.d("surfaceDestroyed");
-    }
-
-    private void openMediaPlayer() {
-        try {
-            if(mDataType == DATA_TYPE_URL) {
-                mMediaPlayer.setDataSource(mContext.getApplicationContext(), Uri.parse(mUrl), mHeaders);
-            }else if(mDataType == DATA_TYPE_FILE) {
-                mMediaPlayer.setDataSource(mFilePath);
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-            LogUtil.e("打开播放器发生错误", e);
-        }
-
-        if(mViewType == VIEW_TYPE_TEXTUREVIEW) {
-            mMediaPlayer.setSurface(new Surface(mSurfaceTexture));
-        }else if(mViewType == VIEW_TYPE_SURFACEVIEW) {
-            mMediaPlayer.setSurface(mSurfaceView.getHolder().getSurface());
-        }
-
-        mMediaPlayer.prepareAsync();
-        mCurrentState = STATE_PREPARING;
-        //mController.setControllerState(mPlayerState, mCurrentState);
-        LogUtil.d("STATE_PREPARING");
     }
 
     public void enterFullScreen() {
@@ -559,31 +298,325 @@ public class AutoMonitorPlayer extends FrameLayout implements TextureView.Surfac
         }
     }
 
-    public void onDoubleClick() {
+    /**
+     * 设置SurfaceView回调,同时初始化SurfaceView
+     * @param cb
+     */
+    public void setSurfaceViewCallBack(ISurfaceViewCallBack cb) {
+        mSurfaceViewCallback = cb;
+        initSurfaceView();
+        addSurfaceView();
+    }
+
+    public void setDragConfig(IDragConfig config) {
+        mConfig = config;
+    }
+
+
+    protected void onDoubleClick() {
         mConfig.onDoubleClick();
     }
 
-    public void onSingalClick() {
+    protected void onSingalClick() {
         mConfig.onSingalClick();
+    }
+
+    /**
+     * 初始化播放容器，用于存放TexureView。其实直接扩展TextureView取代Container也可以
+     */
+    private void init() {
+        //使用可拖动FrameLayout
+        mContainer = new DragFrameLayout(mContext);
+        ((DragFrameLayout)mContainer).setPlayer(this);
+        mContainer.setBackgroundColor(Color.BLACK);
+        LayoutParams params = new LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT);
+        this.addView(mContainer, params);
+    }
+
+    /**
+     * 播放开始
+     */
+    private void start() {
+        //首先释放当前的播放器
+        release();
+        if (mCurrentState == STATE_IDLE
+                || mCurrentState == STATE_ERROR
+                || mCurrentState == STATE_COMPLETED) {
+            initMediaPlayer();
+            if(mViewType == VIEW_TYPE_TEXTUREVIEW) {
+                initTextureView();
+                addTextureView();
+            }else if(mViewType == VIEW_TYPE_SURFACEVIEW) {
+                initSurfaceView();
+                addSurfaceView();
+            }
+        }
+    }
+
+    private void initMediaPlayer() {
+        if (mMediaPlayer == null) {
+            switch (mPlayerType) {
+                case PLAYER_TYPE_NATIVE:
+                    mMediaPlayer = new AndroidMediaPlayer();
+                    break;
+                case PLAYER_TYPE_IJK:
+                    mMediaPlayer = new IjkMediaPlayer();
+                    break;
+                case PLAYER_TYPE_NULL:
+                    return;
+                default:
+                    break;
+            }
+            mMediaPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC);
+            mMediaPlayer.setScreenOnWhilePlaying(true);
+
+            mMediaPlayer.setOnPreparedListener(mOnPreparedListener);
+            mMediaPlayer.setOnVideoSizeChangedListener(mOnVideoSizeChangedListener);
+            mMediaPlayer.setOnCompletionListener(mOnCompletionListener);
+            mMediaPlayer.setOnErrorListener(mOnErrorListener);
+            mMediaPlayer.setOnInfoListener(mOnInfoListener);
+            mMediaPlayer.setOnBufferingUpdateListener(mOnBufferingUpdateListener);
+        }
+    }
+
+    private void initTextureView() {
+        if (mTextureView == null) {
+            mTextureView = new TextureView(mContext);
+            mTextureView.setSurfaceTextureListener(this);
+        }
+    }
+
+    private void addTextureView() {
+        mContainer.removeView(mTextureView);
+        LayoutParams params = new LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT);
+        mContainer.addView(mTextureView, 0, params);
+    }
+
+    private void initSurfaceView() {
+        if (mSurfaceView == null) {
+            mSurfaceView = new SurfaceView(mContext);
+            mSurfaceView.getHolder().addCallback(this);
+        }
+    }
+
+    private void addSurfaceView() {
+        mContainer.removeView(mSurfaceView);
+        LayoutParams params = new LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT);
+        mContainer.addView(mSurfaceView, 0, params);
+    }
+
+    private IMediaPlayer.OnPreparedListener mOnPreparedListener
+            = new IMediaPlayer.OnPreparedListener() {
+        @Override
+        public void onPrepared(IMediaPlayer mp) {
+            mp.start();
+            mCurrentState = STATE_PREPARED;
+            //mController.setControllerState(mPlayerState, mCurrentState);
+            LogUtil.d("onPrepared ——> STATE_PREPARED");
+        }
+    };
+
+    private IMediaPlayer.OnVideoSizeChangedListener mOnVideoSizeChangedListener
+            = new IMediaPlayer.OnVideoSizeChangedListener() {
+        @Override
+        public void onVideoSizeChanged(IMediaPlayer mp, int width, int height, int sar_num, int sar_den) {
+            LogUtil.d("onVideoSizeChanged ——> width：" + width + "，height：" + height);
+        }
+    };
+
+    private IMediaPlayer.OnCompletionListener mOnCompletionListener
+            = new IMediaPlayer.OnCompletionListener() {
+        @Override
+        public void onCompletion(IMediaPlayer mp) {
+            mCurrentState = STATE_COMPLETED;
+            //mController.setControllerState(mPlayerState, mCurrentState);
+            LogUtil.d("onCompletion ——> STATE_COMPLETED");
+            NiceVideoPlayerManager.instance().setCurrentNiceVideoPlayer(null);
+        }
+    };
+
+    private IMediaPlayer.OnErrorListener mOnErrorListener
+            = new IMediaPlayer.OnErrorListener() {
+        @Override
+        public boolean onError(IMediaPlayer mp, int what, int extra) {
+            mCurrentState = STATE_ERROR;
+            //mController.setControllerState(mPlayerState, mCurrentState);
+            LogUtil.d("onError ——> STATE_ERROR ———— what：" + what);
+            return false;
+        }
+    };
+
+    private IMediaPlayer.OnInfoListener mOnInfoListener
+            = new IMediaPlayer.OnInfoListener() {
+        @Override
+        public boolean onInfo(IMediaPlayer mp, int what, int extra) {
+            if (what == MediaPlayer.MEDIA_INFO_VIDEO_RENDERING_START) {
+                // 播放器开始渲染
+                mCurrentState = STATE_PLAYING;
+                //mController.setControllerState(mPlayerState, mCurrentState);
+                LogUtil.d("onInfo ——> MEDIA_INFO_VIDEO_RENDERING_START：STATE_PLAYING");
+            } else if (what == IMediaPlayer.MEDIA_INFO_BUFFERING_START) {
+                // MediaPlayer暂时不播放，以缓冲更多的数据
+                if (mCurrentState == STATE_PAUSED || mCurrentState == STATE_BUFFERING_PAUSED) {
+                    mCurrentState = STATE_BUFFERING_PAUSED;
+                    LogUtil.d("onInfo ——> MEDIA_INFO_BUFFERING_START：STATE_BUFFERING_PAUSED");
+                } else {
+                    mCurrentState = STATE_BUFFERING_PLAYING;
+                    LogUtil.d("onInfo ——> MEDIA_INFO_BUFFERING_START：STATE_BUFFERING_PLAYING");
+                }
+                //.setControllerState(mPlayerState, mCurrentState);
+            } else if (what == IMediaPlayer.MEDIA_INFO_BUFFERING_END) {
+                // 填充缓冲区后，MediaPlayer恢复播放/暂停
+                if (mCurrentState == STATE_BUFFERING_PLAYING) {
+                    mCurrentState = STATE_PLAYING;
+                    //mController.setControllerState(mPlayerState, mCurrentState);
+                    LogUtil.d("onInfo ——> MEDIA_INFO_BUFFERING_END： STATE_PLAYING");
+                }
+                if (mCurrentState == STATE_BUFFERING_PAUSED) {
+                    mCurrentState = STATE_PAUSED;
+                    //mController.setControllerState(mPlayerState, mCurrentState);
+                    LogUtil.d("onInfo ——> MEDIA_INFO_BUFFERING_END： STATE_PAUSED");
+                }
+            } else {
+                LogUtil.d("onInfo ——> what：" + what);
+            }
+            return true;
+        }
+    };
+
+    private IMediaPlayer.OnBufferingUpdateListener mOnBufferingUpdateListener
+            = new IMediaPlayer.OnBufferingUpdateListener() {
+        @Override
+        public void onBufferingUpdate(IMediaPlayer mp, int percent) {
+            mBufferPercentage = percent;
+        }
+    };
+
+    @Override
+    public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width, int height) {
+    }
+
+    @Override
+    public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
+        return mSurfaceTexture == null;
+    }
+
+    @Override
+    public void onSurfaceTextureUpdated(SurfaceTexture surface) {
+    }
+
+    @Override
+    public void onSurfaceTextureAvailable(SurfaceTexture surfaceTexture, int width, int height) {
+        //播放器关联surface
+        if (mSurfaceTexture == null) {
+            mSurfaceTexture = surfaceTexture;
+            openMediaPlayer();
+        } else {
+            mTextureView.setSurfaceTexture(mSurfaceTexture);
+        }
+    }
+
+    @Override
+    public void surfaceCreated(SurfaceHolder holder) {
+        LogUtil.d("surfaceCreated");
+        //这里的holder就是mSurfaceView.getHolder()
+        if(mPlayerType == PLAYER_TYPE_NULL) {
+            if(checkCallBack()) {
+                mSurfaceViewCallback.surfaceCreated(holder);
+            }
+            return;
+        }
+
+        //不同于TextureView,每次切换窗口都会destro和create一次,所以不能在这openMediaPlayer
+        if(mHolder == null) {
+            mHolder = holder;
+            openMediaPlayer();
+        }else {
+            mMediaPlayer.setDisplay(holder);
+        }
+    }
+
+    @Override
+    public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
+        LogUtil.d("surfaceChanged");
+        if(mPlayerType == PLAYER_TYPE_NULL) {
+            if(checkCallBack()) {
+                mSurfaceViewCallback.surfaceChanged(holder,format,width,height);
+            }
+            return;
+        }
+        //不需要
+        //mMediaPlayer.setDisplay(holder);
+    }
+
+    @Override
+    public void surfaceDestroyed(SurfaceHolder holder) {
+        LogUtil.d("surfaceDestroyed");
+        if(mPlayerType == PLAYER_TYPE_NULL) {
+            if(checkCallBack()) {
+                mSurfaceViewCallback.surfaceDestroyed(holder);
+            }
+            return;
+        }
+    }
+
+    private boolean checkCallBack() {
+        if(mSurfaceViewCallback==null) {
+            LogUtil.d("mSurfaceViewCallback is null");
+            return false;
+        }
+        return true;
+    }
+
+    private void openMediaPlayer() {
+        try {
+            if(mDataType == DATA_TYPE_URL) {
+                mMediaPlayer.setDataSource(mContext.getApplicationContext(), Uri.parse(mUrl), mHeaders);
+            }else if(mDataType == DATA_TYPE_FILE) {
+                mMediaPlayer.setDataSource(mFilePath);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+            LogUtil.e("打开播放器发生错误", e);
+        }
+
+        if(mViewType == VIEW_TYPE_TEXTUREVIEW) {
+            mMediaPlayer.setSurface(new Surface(mSurfaceTexture));
+        }else if(mViewType == VIEW_TYPE_SURFACEVIEW) {
+            mMediaPlayer.setSurface(mSurfaceView.getHolder().getSurface());
+        }
+
+        mMediaPlayer.prepareAsync();
+        mCurrentState = STATE_PREPARING;
+        //mController.setControllerState(mPlayerState, mCurrentState);
+        LogUtil.d("STATE_PREPARING");
     }
 
     /**
      * 自定义和可拖动/全屏的窗口相关的配置
      */
-    public interface DragConfig {
+    public interface IDragConfig {
         void onSingalClick();
         void onDoubleClick();
         FrameLayout.LayoutParams getTinyWindowLayoutParams();
     }
 
-    public void setDragConfig(DragConfig config) {
-        mConfig = config;
+    public interface ISurfaceViewCallBack {
+        void surfaceCreated(SurfaceHolder holder);
+        void surfaceChanged(SurfaceHolder holder, int format, int width, int height);
+        void surfaceDestroyed(SurfaceHolder holder);
     }
 
     /**
      * 默认实现类
      */
-    class DefaultDragConfig implements AutoMonitorPlayer.DragConfig{
+    class DefaultDragConfig implements AutoMonitorPlayer.IDragConfig{
 
         @Override
         public void onSingalClick() {
