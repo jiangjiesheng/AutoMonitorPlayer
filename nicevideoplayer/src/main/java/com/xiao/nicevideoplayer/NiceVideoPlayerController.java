@@ -2,6 +2,8 @@ package com.xiao.nicevideoplayer;
 
 import android.content.Context;
 import android.os.CountDownTimer;
+import android.os.Handler;
+import android.os.Message;
 import android.support.annotation.DrawableRes;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -25,6 +27,12 @@ public class NiceVideoPlayerController extends FrameLayout
         implements View.OnClickListener,
         SeekBar.OnSeekBarChangeListener {
 
+    //500ms内点击两次，算双击
+    private static final long DOUBLE_CLICK_INTERVAL = 500;
+    private static final int EXE_SINGAL_CLICK = 1;
+
+    //用于判断双击
+    private long lastClickTime = 0;
     private Context mContext;
     private NiceVideoPlayerControl mNiceVideoPlayer;
     private ImageView mImage;
@@ -120,8 +128,22 @@ public class NiceVideoPlayerController extends FrameLayout
         }
     }
 
-    @Override
-    public void onClick(View v) {
+    private Handler handler = new Handler() {
+
+        @Override
+        public void handleMessage(Message msg) {
+            super.handleMessage(msg);
+            switch (msg.what) {
+                case EXE_SINGAL_CLICK:
+                    singalClick((View)msg.obj);
+                    break;
+                default:
+                    break;
+            }
+        }
+    };
+
+    private void singalClick(View v) {
         if (v == mCenterStart) {
             if (mNiceVideoPlayer.isIdle()) {
                 mNiceVideoPlayer.start();
@@ -159,6 +181,32 @@ public class NiceVideoPlayerController extends FrameLayout
                 setTopBottomVisible(!topBottomVisible);
             }
         }
+    }
+
+    private void doubleClick() {
+        //普通 -> 全屏 ->普通 循环
+        if (mNiceVideoPlayer.isNormal()) {
+            mNiceVideoPlayer.enterFullScreen();
+        } else if (mNiceVideoPlayer.isFullScreen()) {
+            mNiceVideoPlayer.exitFullScreen();
+        }
+    }
+
+    @Override
+    public void onClick(View v) {
+        long currentTime = System.currentTimeMillis();
+        if(currentTime - lastClickTime < DOUBLE_CLICK_INTERVAL) {
+            doubleClick();
+            //确认是双击,取消单击响应
+            handler.removeMessages(EXE_SINGAL_CLICK);
+        }else {
+            //未避免和双击事件冲突, 发送延时消息
+            Message message = new Message();
+            message.obj = v;
+            message.what = EXE_SINGAL_CLICK;
+            handler.sendMessageDelayed(message, DOUBLE_CLICK_INTERVAL);
+        }
+        lastClickTime = currentTime;
     }
 
     private void setTopBottomVisible(boolean visible) {

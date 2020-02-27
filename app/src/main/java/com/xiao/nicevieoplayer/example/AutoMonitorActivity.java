@@ -4,6 +4,7 @@ import android.content.Context;
 import android.os.Bundle;
 import android.support.annotation.Nullable;
 import android.support.v7.app.AppCompatActivity;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.FrameLayout;
@@ -39,7 +40,7 @@ public class AutoMonitorActivity extends AppCompatActivity {
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.auto_monitort);
+        setContentView(R.layout.auto_monitor);
         init();
     }
 
@@ -113,6 +114,14 @@ public class AutoMonitorActivity extends AppCompatActivity {
      */
 
     @Override
+    protected void onRestart() {
+        Log.d(TAG,"onRestart");
+        super.onRestart();
+        mPlayer.resetSurfaceView();
+    }
+
+
+    @Override
     public void onBackPressed() {
         if (mPlayer != null) {
             if (mPlayer.isFullScreen()) {
@@ -127,12 +136,12 @@ public class AutoMonitorActivity extends AppCompatActivity {
     }
 
     @Override
-    protected void onStop() {
+    protected void onDestroy() {
         if (mPlayer != null) {
             mPlayer.release();
             mPlayer = null;
         }
-        super.onStop();
+        super.onDestroy();
     }
 
     public void enterTinyWindow(View view) {

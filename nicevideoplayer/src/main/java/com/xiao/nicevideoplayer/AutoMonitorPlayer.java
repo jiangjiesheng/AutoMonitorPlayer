@@ -136,6 +136,15 @@ public class AutoMonitorPlayer extends FrameLayout implements TextureView.Surfac
     }
 
     /**
+     * SurfaceView在home后切回来会黑屏,因为SurfaceView不显示时会执行surfaceDestroyed
+     * 但问题是，再次切回前台，不会自动调用surfaceCreated，所以需要手动重新初始化
+     */
+    public void resetSurfaceView() {
+        releaseSurfaceView();
+        start();
+    }
+
+    /**
      * 释放资源，重置状态
      */
     public void release() {
@@ -160,6 +169,15 @@ public class AutoMonitorPlayer extends FrameLayout implements TextureView.Surfac
 
         mCurrentState = STATE_IDLE;
         mPlayerState = PLAYER_NORMAL;
+    }
+
+    private void releaseSurfaceView() {
+        mContainer.removeView(mSurfaceView);
+        if(mSurfaceView != null && mSurfaceView.getHolder() != null) {
+            mSurfaceView.getHolder().removeCallback(this);
+        }
+        mSurfaceView = null;
+        mHolder = null;
     }
 
     /**
@@ -299,7 +317,7 @@ public class AutoMonitorPlayer extends FrameLayout implements TextureView.Surfac
     }
 
     /**
-     * 设置SurfaceView回调,同时初始化SurfaceView
+     * 设置SurfaceView回调,同时初始化SurfaceView。用于使用外部播放器时。
      * @param cb
      */
     public void setSurfaceViewCallBack(ISurfaceViewCallBack cb) {
@@ -397,7 +415,7 @@ public class AutoMonitorPlayer extends FrameLayout implements TextureView.Surfac
     }
 
     private void initSurfaceView() {
-        if (mSurfaceView == null) {
+        if (mHolder == null) {
             mSurfaceView = new SurfaceView(mContext);
             mSurfaceView.getHolder().addCallback(this);
         }
@@ -553,6 +571,7 @@ public class AutoMonitorPlayer extends FrameLayout implements TextureView.Surfac
         }
         //不需要
         //mMediaPlayer.setDisplay(holder);
+        //mSurfaceView.setZOrderOnTop(false);
     }
 
     @Override
@@ -564,6 +583,8 @@ public class AutoMonitorPlayer extends FrameLayout implements TextureView.Surfac
             }
             return;
         }
+        //mMediaPlayer.pause();
+        //releaseSurfaceView();
     }
 
     private boolean checkCallBack() {
@@ -594,7 +615,6 @@ public class AutoMonitorPlayer extends FrameLayout implements TextureView.Surfac
 
         mMediaPlayer.prepareAsync();
         mCurrentState = STATE_PREPARING;
-        //mController.setControllerState(mPlayerState, mCurrentState);
         LogUtil.d("STATE_PREPARING");
     }
 

@@ -13,9 +13,8 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
         <activity
-            android:name=".example.AutoMonitorActivity"
-            android:configChanges="orientation|keyboardHidden|screenSize"
-            android:screenOrientation="portrait">
+            android:name=".example.MultiMonitorActivity"
+            android:configChanges="orientation|keyboardHidden|screenSize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
@@ -24,7 +23,16 @@
         <activity
             android:name=".example.RecyclerViewActivity"
             android:configChanges="orientation|keyboardHidden|screenSize"
+            >
+        </activity>
+        <activity
+            android:name=".example.MainActivity"
+            android:configChanges="orientation|keyboardHidden|screenSize"
             android:screenOrientation="portrait">
+        </activity>
+        <activity
+            android:name=".example.AutoMonitorActivity"
+            android:configChanges="orientation|keyboardHidden|screenSize">
         </activity>
     </application>
 
