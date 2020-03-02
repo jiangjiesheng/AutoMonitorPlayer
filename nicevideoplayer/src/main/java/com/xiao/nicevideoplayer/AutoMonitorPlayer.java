@@ -1,5 +1,6 @@
 package com.xiao.nicevideoplayer;
 
+import android.app.Dialog;
 import android.content.Context;
 import android.content.pm.ActivityInfo;
 import android.graphics.Color;
@@ -63,6 +64,9 @@ public class AutoMonitorPlayer extends FrameLayout implements TextureView.Surfac
     public static final int VIEW_TYPE_TEXTUREVIEW = 1111;
     public static final int VIEW_TYPE_SURFACEVIEW = 2222;
 
+    public static final int WINDOW_TYPE_VIEW = 3333;
+    public static final int WINDOW_TYPE_DIALOG = 4444;
+
     public static final int DATA_TYPE_URL = 11111;
     public static final int DATA_TYPE_FILE = 22222;
 
@@ -74,6 +78,7 @@ public class AutoMonitorPlayer extends FrameLayout implements TextureView.Surfac
     private int mPlayerState = PLAYER_NORMAL;
     private int mViewType = VIEW_TYPE_TEXTUREVIEW;
     private int mDataType = DATA_TYPE_URL;
+    private int mTinyWindowType = WINDOW_TYPE_VIEW;
     //是否允许切换横屏
     private boolean mLandscape = false;
 
@@ -83,6 +88,7 @@ public class AutoMonitorPlayer extends FrameLayout implements TextureView.Surfac
     private TextureView mTextureView;
     private SurfaceTexture mSurfaceTexture;
     private SurfaceView mSurfaceView;
+    private Dialog mTinyDialg;
     //这个纯粹是用来标记是否要初始化MediaPlayer的
     private SurfaceHolder mHolder;
     private IMediaPlayer mMediaPlayer;
@@ -189,15 +195,19 @@ public class AutoMonitorPlayer extends FrameLayout implements TextureView.Surfac
         mPlayerType = playerType;
     }
 
+    public void setTinyWindowType(int type) {
+        mTinyWindowType = type;
+    }
+
     public void enterFullScreen() {
-        if (mPlayerState == PLAYER_FULL_SCREEN) {
+        if (isFullScreen()) {
             return;
-        }else if(mPlayerState == PLAYER_TINY_WINDOW) {
+        }else if(isTinyWindow()) {
             //需要从老的parent节点把mContainer移除
             //如果是normal，因为全屏时parent并没有改变，所以不需要这一步
-            ViewGroup contentView = (ViewGroup) NiceUtil.scanForActivity(mContext)
-                    .findViewById(android.R.id.content);
-            contentView.removeView(mContainer);
+            exitTinyWindow();
+        }else if(isNormal()) {
+            exitNormalScreen();
         }
         // 隐藏ActionBar、状态栏，并横屏
         NiceUtil.hideActionBar(mContext);
@@ -206,7 +216,6 @@ public class AutoMonitorPlayer extends FrameLayout implements TextureView.Surfac
                     .setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
         }
 
-        this.removeView(mContainer);
         ViewGroup contentView = (ViewGroup) NiceUtil.scanForActivity(mContext)
                 .findViewById(android.R.id.content);
         LayoutParams params = new LayoutParams(
@@ -226,67 +235,106 @@ public class AutoMonitorPlayer extends FrameLayout implements TextureView.Surfac
      *
      * @return true退出全屏.
      */
-    public boolean exitFullScreen() {
-        if (mPlayerState == PLAYER_FULL_SCREEN) {
+    private boolean exitFullScreen() {
+        if (isFullScreen()) {
             NiceUtil.showActionBar(mContext);
             if(mLandscape) {
                 NiceUtil.scanForActivity(mContext)
                         .setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
             }
-
             ViewGroup contentView = (ViewGroup) NiceUtil.scanForActivity(mContext)
                     .findViewById(android.R.id.content);
             contentView.removeView(mContainer);
-            LayoutParams params = new LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.MATCH_PARENT);
-            this.addView(mContainer, params);
 
-            mPlayerState = PLAYER_NORMAL;
-            //mController.setControllerState(mPlayerState, mCurrentState);
-            LogUtil.d("PLAYER_NORMAL");
             return true;
         }
         return false;
+    }
+
+    public boolean enterNormalScreen() {
+        if(isNormal()) {
+            return false;
+        }else if(isFullScreen()){
+            exitFullScreen();
+        }else if(isTinyWindow()) {
+            exitTinyWindow();
+        }
+
+        LayoutParams params = new LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT);
+        this.addView(mContainer, params);
+        LogUtil.d("PLAYER_NORMAL");
+        mPlayerState = PLAYER_NORMAL;
+        return true;
     }
 
     /**
      * 进入小窗口播放，小窗口播放的实现原理与全屏播放类似。
      */
     public void enterTinyWindow() {
-        if (mPlayerState == PLAYER_TINY_WINDOW) {
+        if (isTinyWindow()) {
             return;
         }
-        //父节点变了，需要从老的父节点处删掉容器
-        this.removeView(mContainer);
+        if(isNormal()) {
+            exitNormalScreen();
+        }else if(isFullScreen()){
+            exitFullScreen();
+        }
 
-        //android.R.id.content是MainActivity布局最外面的一层FrameLayout
-        ViewGroup contentView = (ViewGroup) NiceUtil.scanForActivity(mContext)
-                .findViewById(android.R.id.content);
+        if(mTinyWindowType==WINDOW_TYPE_VIEW) {
+            //父节点变了，需要从老的父节点处删掉容器
+            this.removeView(mContainer);
 
-        FrameLayout.LayoutParams params = mConfig.getTinyWindowLayoutParams();
-        contentView.addView(mContainer, params);
+            //android.R.id.content是MainActivity布局最外面的一层FrameLayout
+            ViewGroup contentView = (ViewGroup) NiceUtil.scanForActivity(mContext)
+                    .findViewById(android.R.id.content);
+
+            FrameLayout.LayoutParams params = mConfig.getTinyWindowLayoutParams();
+            contentView.addView(mContainer, params);
+        }else {
+            mTinyDialg = createTinyWindow();
+            mTinyDialg.addContentView(mContainer,new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+            //mTinyDialg.getWindow().getWindowManager().addView(mContainer,new FrameLayout.LayoutParams(
+            //        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
+            mTinyDialg.show();
+        }
         mPlayerState = PLAYER_TINY_WINDOW;
-
         LogUtil.d("PLAYER_TINY_WINDOW");
     }
 
     /**
      * 退出小窗口播放
      */
-    public boolean exitTinyWindow() {
+    private boolean exitTinyWindow() {
         if (mPlayerState == PLAYER_TINY_WINDOW) {
-            ViewGroup contentView = (ViewGroup) NiceUtil.scanForActivity(mContext)
-                    .findViewById(android.R.id.content);
-            contentView.removeView(mContainer);
-            LayoutParams params = new LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.MATCH_PARENT);
-            this.addView(mContainer, params);
+            if(mTinyWindowType==WINDOW_TYPE_VIEW) {
+                ViewGroup contentView = (ViewGroup) NiceUtil.scanForActivity(mContext)
+                        .findViewById(android.R.id.content);
+                contentView.removeView(mContainer);
+            }else {
+                if(mTinyDialg!=null && mTinyDialg.isShowing()) {
+                    LogUtil.d("~~~~~~~~~~~~~~~~~~exitTinyWindow globa");
+                    //怎么把Dialog中的child view删掉? 不然无法更改这个child的父节点
+                    mTinyDialg.getWindow().getWindowManager().removeView(mContainer);
+                    mTinyDialg.dismiss();
+                }
+                mTinyDialg = null;
+            }
 
-            mPlayerState = PLAYER_NORMAL;
-            //mController.setControllerState(mPlayerState, mCurrentState);
-            LogUtil.d("PLAYER_NORMAL");
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * 退出普通播放
+     */
+    private boolean exitNormalScreen() {
+        if (isNormal()) {
+            this.removeView(mContainer);
             return true;
         }
         return false;
@@ -351,6 +399,13 @@ public class AutoMonitorPlayer extends FrameLayout implements TextureView.Surfac
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT);
         this.addView(mContainer, params);
+    }
+
+    private Dialog createTinyWindow() {
+        TinyDialog dialog = new TinyDialog(mContext);
+        dialog.setWindowParam(mConfig.getTinyWindowLayoutParams());
+
+        return dialog;
     }
 
     /**

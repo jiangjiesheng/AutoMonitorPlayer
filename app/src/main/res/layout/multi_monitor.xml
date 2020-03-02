@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    tools:context="com.xiao.nicevieoplayer.example.MultiMonitorActivity">
+
+    <LinearLayout
+        android:id="@+id/ll_container"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginBottom="8dp"
+        android:layout_marginTop="16dp"
+        android:layout_weight="4"
+        android:orientation="horizontal">
+
+        <com.xiao.nicevideoplayer.AutoMonitorPlayer
+            android:id="@+id/auto_video_player1"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_weight="3"/>
+        <com.xiao.nicevideoplayer.AutoMonitorPlayer
+            android:id="@+id/auto_video_player2"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_weight="3"/>
+        <com.xiao.nicevideoplayer.AutoMonitorPlayer
+            android:id="@+id/auto_video_player3"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_weight="3"/>
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/ll_container2"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginBottom="8dp"
+        android:layout_marginTop="16dp"
+        android:layout_weight="4"
+        android:orientation="horizontal">
+
+        <com.xiao.nicevideoplayer.AutoMonitorPlayer
+            android:id="@+id/auto_video_player4"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_weight="3"/>
+        <com.xiao.nicevideoplayer.AutoMonitorPlayer
+            android:id="@+id/auto_video_player5"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_weight="3"/>
+        <com.xiao.nicevideoplayer.AutoMonitorPlayer
+            android:id="@+id/auto_video_player6"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_weight="3"/>
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/ll_container3"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginBottom="8dp"
+        android:layout_marginTop="16dp"
+        android:layout_weight="4"
+        android:orientation="horizontal">
+
+        <com.xiao.nicevideoplayer.AutoMonitorPlayer
+            android:id="@+id/auto_video_player7"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_weight="3"/>
+        <com.xiao.nicevideoplayer.AutoMonitorPlayer
+            android:id="@+id/auto_video_player8"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_weight="3"/>
+        <com.xiao.nicevideoplayer.AutoMonitorPlayer
+            android:id="@+id/auto_video_player9"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_weight="3"/>
+    </LinearLayout>
+
+    <Button
+        android:id="@+id/button"
+        android:onClick="goToNicePlayer"
+        android:text="测试NicePlayer"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="4" />
+
+</LinearLayout>

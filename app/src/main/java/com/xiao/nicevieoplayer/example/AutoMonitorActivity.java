@@ -53,6 +53,8 @@ public class AutoMonitorActivity extends AppCompatActivity {
         mPlayer.setLandscape(false);
         //这一步可以省略，AutoMonitorPlayer中有默认的实现
         mPlayer.setDragConfig(new MonitorDragConfig(this, mPlayer));
+        mPlayer.setTinyWindowType(AutoMonitorPlayer.WINDOW_TYPE_DIALOG);
+        //mPlayer.setTinyWindowType(AutoMonitorPlayer.WINDOW_TYPE_VIEW);
         mPlayer.setUp("http://tanzi27niu.cdsb.mobi/wps/wp-content/uploads/2017/05/2017-05-17_17-33-30.mp4", null);
 
         /*
@@ -125,9 +127,9 @@ public class AutoMonitorActivity extends AppCompatActivity {
     public void onBackPressed() {
         if (mPlayer != null) {
             if (mPlayer.isFullScreen()) {
-                mPlayer.exitFullScreen();
+                mPlayer.enterNormalScreen();
             } else if (mPlayer.isTinyWindow()) {
-                mPlayer.exitTinyWindow();
+                mPlayer.enterNormalScreen();
             } else {
                 mPlayer.release();
                 super.onBackPressed();
@@ -169,7 +171,7 @@ public class AutoMonitorActivity extends AppCompatActivity {
             } else if (mPlayer.isTinyWindow()) {
                 mPlayer.enterFullScreen();
             } else if (mPlayer.isFullScreen()) {
-                mPlayer.exitFullScreen();
+                mPlayer.enterNormalScreen();
             }
         }
 
