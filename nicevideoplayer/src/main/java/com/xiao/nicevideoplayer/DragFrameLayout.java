@@ -35,6 +35,7 @@ public class DragFrameLayout extends FrameLayout implements View.OnTouchListener
     private long lastClickTime = 0;
 
     private AutoMonitorPlayer mPlayer;
+    private boolean mDragable = true;
 
 /*
     private static final int TOP = 0x15;
@@ -67,6 +68,14 @@ public class DragFrameLayout extends FrameLayout implements View.OnTouchListener
         initScreenWH();
     }
 
+    /**
+     * 设置是否可以拖动
+     * @param dragable true:可以拖动
+     */
+    public void setDragable(boolean dragable) {
+        mDragable = dragable;
+    }
+
     private void initScreenWH() {
         //要注意减去systemUI？
         screenHeight = getResources().getDisplayMetrics().heightPixels;
@@ -82,7 +91,7 @@ public class DragFrameLayout extends FrameLayout implements View.OnTouchListener
     public boolean onTouch(View v, MotionEvent event) {
         //如果点击位置不在本控件内，不会调到这里
         //仅限于tinyWindow状态才能拖动
-        if(!mPlayer.isTinyWindow()) {
+        if(!mPlayer.isTinyWindow() || !mDragable) {
             return false;
         }
 

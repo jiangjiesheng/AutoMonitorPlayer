@@ -8,6 +8,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.provider.Settings;
 import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.ViewGroup;
@@ -81,7 +82,14 @@ public class TinyDialog extends Dialog {
 
     @Override
     public boolean onTouchEvent(@NonNull MotionEvent event) {
+        //目前只有在小窗以外的地方点击有响应, 怀疑是小窗内部消息被DragFrameLayout消化了
+        LogUtil.d("dialog onTouchEvent");
         return super.onTouchEvent(event);
+    }
+
+    @Override
+    public void setOnKeyListener(@Nullable OnKeyListener onKeyListener) {
+        super.setOnKeyListener(onKeyListener);
     }
 
     @Override

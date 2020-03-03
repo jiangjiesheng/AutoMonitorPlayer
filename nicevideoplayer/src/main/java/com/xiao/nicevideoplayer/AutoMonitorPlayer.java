@@ -17,6 +17,7 @@ import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.TextureView;
 import android.view.ViewGroup;
+import android.view.ViewParent;
 import android.widget.FrameLayout;
 
 import java.io.IOException;
@@ -71,7 +72,7 @@ public class AutoMonitorPlayer extends FrameLayout implements TextureView.Surfac
     public static final int DATA_TYPE_FILE = 22222;
 
     private Context mContext;
-    private FrameLayout mContainer;
+    private DragFrameLayout mContainer;
 
     private int mPlayerType = PLAYER_TYPE_IJK;
     private int mCurrentState = STATE_IDLE;
@@ -293,6 +294,7 @@ public class AutoMonitorPlayer extends FrameLayout implements TextureView.Surfac
             FrameLayout.LayoutParams params = mConfig.getTinyWindowLayoutParams();
             contentView.addView(mContainer, params);
         }else {
+            mContainer.setDragable(false);
             mTinyDialg = createTinyWindow();
             mTinyDialg.addContentView(mContainer,new FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
@@ -315,13 +317,16 @@ public class AutoMonitorPlayer extends FrameLayout implements TextureView.Surfac
                         .findViewById(android.R.id.content);
                 contentView.removeView(mContainer);
             }else {
+                //把Dialog中的child view删掉,
+                ((ViewGroup)mContainer.getParent()).removeView(mContainer);
+                //这样不行
+                //mTinyDialg.getWindow().getWindowManager().removeView(mContainer);
                 if(mTinyDialg!=null && mTinyDialg.isShowing()) {
-                    LogUtil.d("~~~~~~~~~~~~~~~~~~exitTinyWindow globa");
-                    //怎么把Dialog中的child view删掉? 不然无法更改这个child的父节点
-                    mTinyDialg.getWindow().getWindowManager().removeView(mContainer);
+
                     mTinyDialg.dismiss();
                 }
                 mTinyDialg = null;
+                mContainer.setDragable(true);
             }
 
             return true;

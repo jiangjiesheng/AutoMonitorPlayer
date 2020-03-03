@@ -154,7 +154,7 @@ public class AutoMonitorActivity extends AppCompatActivity {
         private WeakReference<Context> mContext;
 
         public MonitorDragConfig(Context context, AutoMonitorPlayer player) {
-            this.mContext = new WeakReference<Context>(context);;
+            this.mContext = new WeakReference<Context>(context);
         }
 
         @Override
