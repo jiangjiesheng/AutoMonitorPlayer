@@ -294,7 +294,6 @@ public class AutoMonitorPlayer extends FrameLayout implements TextureView.Surfac
             FrameLayout.LayoutParams params = mConfig.getTinyWindowLayoutParams();
             contentView.addView(mContainer, params);
         }else {
-            mContainer.setDragable(false);
             mTinyDialg = createTinyWindow();
             mTinyDialg.addContentView(mContainer,new FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
@@ -317,7 +316,7 @@ public class AutoMonitorPlayer extends FrameLayout implements TextureView.Surfac
                         .findViewById(android.R.id.content);
                 contentView.removeView(mContainer);
             }else {
-                //把Dialog中的child view删掉,
+                //把Dialog中View(可能是getWindow().getDecorView())的child view删掉,
                 ((ViewGroup)mContainer.getParent()).removeView(mContainer);
                 //这样不行
                 //mTinyDialg.getWindow().getWindowManager().removeView(mContainer);
@@ -326,7 +325,6 @@ public class AutoMonitorPlayer extends FrameLayout implements TextureView.Surfac
                     mTinyDialg.dismiss();
                 }
                 mTinyDialg = null;
-                mContainer.setDragable(true);
             }
 
             return true;
@@ -407,7 +405,7 @@ public class AutoMonitorPlayer extends FrameLayout implements TextureView.Surfac
     }
 
     private Dialog createTinyWindow() {
-        TinyDialog dialog = new TinyDialog(mContext);
+        TinyDialog dialog = new TinyDialog(mContext,this);
         dialog.setWindowParam(mConfig.getTinyWindowLayoutParams());
 
         return dialog;

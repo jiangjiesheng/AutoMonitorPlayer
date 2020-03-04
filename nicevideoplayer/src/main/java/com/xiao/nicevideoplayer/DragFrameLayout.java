@@ -87,6 +87,14 @@ public class DragFrameLayout extends FrameLayout implements View.OnTouchListener
         mPlayer = player;
     }
 
+    /**
+     * View给自身分发事件时,会先调mOnTouchListener.onTouch再调
+     * 自身的onTouchEvent。
+     * 同时，只有onTouch或自身的onTouchEvent这边没有消耗事件，在onKeyUp时才调到onClick
+     * @param v
+     * @param event
+     * @return
+     */
     @Override
     public boolean onTouch(View v, MotionEvent event) {
         //如果点击位置不在本控件内，不会调到这里
