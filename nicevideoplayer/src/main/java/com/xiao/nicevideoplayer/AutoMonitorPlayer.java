@@ -609,7 +609,9 @@ public class AutoMonitorPlayer extends FrameLayout implements TextureView.Surfac
             return;
         }
 
-        //不同于TextureView,每次切换窗口都会destro和create一次,所以不能在这openMediaPlayer
+        //不同于TextureView,每次切换窗口,surfaceView中的surface都会destroy和create一次
+        //如果是第一次创建，则调用openMediaPlayer从头开始播放
+        //如果是播放过程中的窗口切换，则更新surfaceHolder
         if(mHolder == null) {
             mHolder = holder;
             openMediaPlayer();
